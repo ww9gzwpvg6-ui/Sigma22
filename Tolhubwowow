@@ -1,6 +1,6 @@
 -- Tolhub [Ultimate Quality - Camera Aim, Air Dribble & Realistic Float Edition]
 -- PC & Xeno Fully Optimized Version (Anti-Glue & Side Reach Fixed)
--- [+ Avatar Stealer: English Log & Ultimate Accessories Bypass]
+-- [+ Added Visual Hitboxes (Front, Side, Back, Head) & Bypasses]
 
 if getgenv().TolhubLoaded then
     print("Tolhub is already running!")
@@ -18,22 +18,9 @@ local HttpService = game:GetService("HttpService")
 local LocalPlayer = Players.LocalPlayer
 local DiscordLink = "https://discord.gg/eEzWQJAyFA"
 
--- نظام كول داون منفصل لكل اتجاه لمنع التعليق والالتصاق على الـ PC
-local Cooldowns = {
-    Front = 0.04,
-    Side = 0.14,
-    Back = 0.1,
-    Head = 0.1
-}
+local Cooldowns = { Front = 0.04, Side = 0.14, Back = 0.1, Head = 0.1 }
+local LastDirectionTicks = { Front = 0, Side = 0, Back = 0, Head = 0 }
 
-local LastDirectionTicks = {
-    Front = 0,
-    Side = 0,
-    Back = 0,
-    Head = 0
-}
-
--- قيم وإعدادات
 local Configs = {
     Front = {Enabled = false, Value = 0},
     Side  = {Enabled = false, Value = 0},
@@ -45,22 +32,27 @@ local Configs = {
 local GlobalData = {
     MaxLimit = 15,
     LimitEndTime = 0,
-    CodeUsed = false
+    CodeUsed = false,
+    AutoSteal = false,
+    SavedAvatarUser = ""
 }
+
+local ShowHitboxes = false
+local VisualHitboxes = {}
 
 local function SaveConfig()
     if writefile then
         pcall(function()
             local dataToSave = { Configs = Configs, GlobalData = GlobalData }
-            writefile("Tolhub_Data_V5.json", HttpService:JSONEncode(dataToSave))
+            writefile("Tolhub_Data_V6.json", HttpService:JSONEncode(dataToSave))
         end)
     end
 end
 
 local function LoadConfig()
-    if readfile and isfile and isfile("Tolhub_Data_V5.json") then
+    if readfile and isfile and isfile("Tolhub_Data_V6.json") then
         pcall(function()
-            local decoded = HttpService:JSONDecode(readfile("Tolhub_Data_V5.json"))
+            local decoded = HttpService:JSONDecode(readfile("Tolhub_Data_V6.json"))
             if decoded.Configs then
                 for k, v in pairs(decoded.Configs) do
                     if Configs[k] and k ~= "Air Dribble" then
@@ -70,9 +62,11 @@ local function LoadConfig()
                 end
             end
             if decoded.GlobalData then
-                GlobalData.MaxLimit = decoded.GlobalData.MaxLimit
-                GlobalData.LimitEndTime = decoded.GlobalData.LimitEndTime
-                GlobalData.CodeUsed = decoded.GlobalData.CodeUsed
+                GlobalData.MaxLimit = decoded.GlobalData.MaxLimit or 15
+                GlobalData.LimitEndTime = decoded.GlobalData.LimitEndTime or 0
+                GlobalData.CodeUsed = decoded.GlobalData.CodeUsed or false
+                GlobalData.AutoSteal = decoded.GlobalData.AutoSteal or false
+                GlobalData.SavedAvatarUser = decoded.GlobalData.SavedAvatarUser or ""
             end
         end)
     end
@@ -88,30 +82,98 @@ if GlobalData.MaxLimit == 17 and os.time() > GlobalData.LimitEndTime then
     SaveConfig()
 end
 
-local TargetGui = (gethui and gethui()) or game:GetService("CoreGui")
-
-if TargetGui:FindFirstChild("Tolhub") then 
-    TargetGui.Tolhub:Destroy() 
+-- نظام رسم الهيت بوكس المرئي
+local function ClearVisuals()
+    for _, v in pairs(VisualHitboxes) do
+        if v and v.Parent then v:Destroy() end
+    end
+    table.clear(VisualHitboxes)
 end
+
+local function CreateVisualPart(name, color, size, offset)
+    local char = LocalPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+
+    local part = Instance.new("Part")
+    part.Name = name .. "_Visual"
+    part.Anchored = false
+    part.CanCollide = false
+    part.CanTouch = false -- مهم جداً عشان ما يخرب لمس الكرة
+    part.CanQuery = false
+    part.Massless = true
+    part.Material = Enum.Material.ForceField
+    part.Color = color
+    part.Size = size
+    part.CastShadow = false
+    
+    part.CFrame = root.CFrame * offset
+    local weld = Instance.new("WeldConstraint")
+    weld.Part0 = root
+    weld.Part1 = part
+    weld.Parent = part
+    part.Parent = char
+    table.insert(VisualHitboxes, part)
+end
+
+local function UpdateHitboxVisuals()
+    ClearVisuals()
+    if not ShowHitboxes then return end
+    
+    local char = LocalPlayer.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+
+    -- رسم Front (أزرق)
+    if Configs.Front.Enabled and Configs.Front.Value > 0 then
+        local val = Configs.Front.Value
+        CreateVisualPart("Front", Color3.new(0, 0.5, 1), Vector3.new(val, 2.5, val), CFrame.new(0, 0, -val/2))
+    end
+    
+    -- رسم Back (أخضر)
+    if Configs.Back.Enabled and Configs.Back.Value > 0 then
+        local val = Configs.Back.Value
+        CreateVisualPart("Back", Color3.new(0, 1, 0.2), Vector3.new(val, 2.5, val), CFrame.new(0, 0, val/2))
+    end
+    
+    -- رسم Side (أحمر) - زوايا فقط زي رسمتك
+    if Configs.Side.Enabled and Configs.Side.Value > 0 then
+        local val = Configs.Side.Value
+        if val > 1.2 then
+            local sizeVal = val - 1.2
+            local size = Vector3.new(sizeVal, 2.5, sizeVal)
+            local offsetDist = 1.2 + (sizeVal / 2)
+            CreateVisualPart("Side_FL", Color3.new(1, 0, 0), size, CFrame.new(-offsetDist, 0, -offsetDist))
+            CreateVisualPart("Side_FR", Color3.new(1, 0, 0), size, CFrame.new(offsetDist, 0, -offsetDist))
+            CreateVisualPart("Side_BL", Color3.new(1, 0, 0), size, CFrame.new(-offsetDist, 0, offsetDist))
+            CreateVisualPart("Side_BR", Color3.new(1, 0, 0), size, CFrame.new(offsetDist, 0, offsetDist))
+        end
+    end
+    
+    -- رسم Head (أصفر)
+    if Configs.Head.Enabled and Configs.Head.Value > 0 then
+        local val = Configs.Head.Value
+        CreateVisualPart("Head", Color3.new(1, 1, 0), Vector3.new(val, val, val), CFrame.new(0, 2 + val/2, 0))
+    end
+end
+
+LocalPlayer.CharacterAdded:Connect(function()
+    task.wait(1)
+    UpdateHitboxVisuals()
+end)
+
+local TargetGui = (gethui and gethui()) or game:GetService("CoreGui")
+if TargetGui:FindFirstChild("Tolhub") then TargetGui.Tolhub:Destroy() end
 
 local ScreenGui = Instance.new("ScreenGui", TargetGui)
 ScreenGui.Name = "Tolhub"
 ScreenGui.ResetOnSpawn = false
 
 local function SetupDraggableButton(btn, onClick)
-    local Dragging = false
-    local DragInput = nil
-    local DragStart = Vector3.new()
-    local StartPosition = UDim2.new()
-    local Moved = false
+    local Dragging, DragInput, DragStart, StartPosition, Moved = false, nil, Vector3.new(), UDim2.new(), false
 
     btn.InputBegan:Connect(function(input)
         if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
-            Dragging = true
-            Moved = false
-            DragInput = input
-            DragStart = input.Position
-            StartPosition = btn.Position
+            Dragging, Moved, DragInput, DragStart, StartPosition = true, false, input, input.Position, btn.Position
         end
     end)
 
@@ -125,11 +187,8 @@ local function SetupDraggableButton(btn, onClick)
 
     btn.InputEnded:Connect(function(input)
         if input == DragInput then
-            Dragging = false
-            DragInput = nil
-            if not Moved and onClick then
-                onClick()
-            end
+            Dragging, DragInput = false, nil
+            if not Moved and onClick then onClick() end
         end
     end)
 end
@@ -144,9 +203,7 @@ ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 ToggleButton.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
 ToggleButton.BackgroundTransparency = 0.2
 Instance.new("UICorner", ToggleButton).CornerRadius = UDim.new(0, 12)
-local ToggleStroke = Instance.new("UIStroke", ToggleButton)
-ToggleStroke.Thickness = 1
-ToggleStroke.Color = Color3.fromRGB(0, 170, 255)
+Instance.new("UIStroke", ToggleButton).Color = Color3.fromRGB(0, 170, 255)
 
 local FloatButton = Instance.new("TextButton", ScreenGui)
 FloatButton.Size = UDim2.new(0, 55, 0, 55)
@@ -171,7 +228,6 @@ local function ToggleFloat(state)
     if IsFloating then
         FloatButton.Text = "Float\nON"
         FloatButton.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
-        
         FloatConnection = RunService.Heartbeat:Connect(function()
             pcall(function()
                 local Char = LocalPlayer.Character
@@ -186,13 +242,9 @@ local function ToggleFloat(state)
     else
         FloatButton.Text = "Float\nOFF"
         FloatButton.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
-        if FloatConnection then
-            FloatConnection:Disconnect()
-            FloatConnection = nil
-        end
+        if FloatConnection then FloatConnection:Disconnect(); FloatConnection = nil end
     end
 end
-
 SetupDraggableButton(FloatButton, function() ToggleFloat(not IsFloating) end)
 
 local MainFrame = Instance.new("Frame", ScreenGui)
@@ -219,10 +271,7 @@ local function CloseUI()
     TweenService:Create(MainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {Position = UDim2.new(0.5, -220, -1.5, -130)}):Play()
     task.delay(0.4, function() MainFrame.Visible = false end)
 end
-
-SetupDraggableButton(ToggleButton, function()
-    if MainFrame.Visible then CloseUI() else OpenUI() end
-end)
+SetupDraggableButton(ToggleButton, function() if MainFrame.Visible then CloseUI() else OpenUI() end end)
 
 local Sidebar = Instance.new("ScrollingFrame", MainFrame)
 Sidebar.Size = UDim2.new(0, 110, 1, -20)
@@ -246,10 +295,7 @@ local function ShowNotification(msg)
     NotifFrame.Position = UDim2.new(1, 10, 0, 20)
     NotifFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
     Instance.new("UICorner", NotifFrame).CornerRadius = UDim.new(0, 8)
-  
-    local NotifStroke = Instance.new("UIStroke", NotifFrame)
-    NotifStroke.Color = Color3.fromRGB(255, 150, 0)
-    NotifStroke.Thickness = 1
+    Instance.new("UIStroke", NotifFrame).Color = Color3.fromRGB(255, 150, 0)
     local NotifText = Instance.new("TextLabel", NotifFrame)
     NotifText.Size = UDim2.new(1, 0, 1, 0)
     NotifText.BackgroundTransparency = 1
@@ -260,8 +306,96 @@ local function ShowNotification(msg)
     TweenService:Create(NotifFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Position = UDim2.new(1, -260, 0, 20)}):Play()
     task.delay(2.5, function()
         TweenService:Create(NotifFrame, TweenInfo.new(0.3), {Position = UDim2.new(1, 10, 0, 20)}):Play()
-        task.wait(0.3)
-        NotifFrame:Destroy()
+        task.wait(0.3); NotifFrame:Destroy()
+    end)
+end
+
+local function ApplyAvatarLogic(targetName, logFunc)
+    task.spawn(function()
+        local success, userId = pcall(function() return Players:GetUserIdFromNameAsync(targetName) end)
+        if success and userId then
+            if logFunc then logFunc("Player found! ID: " .. userId, Color3.fromRGB(0, 255, 120)) end
+            task.wait(0.3)
+            
+            local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            
+            if hum then
+                pcall(function()
+                    if logFunc then logFunc("Removing current avatar...", Color3.fromRGB(255, 170, 0)) end
+                    for _, v in pairs(char:GetChildren()) do
+                        if v:IsA("Shirt") or v:IsA("Pants") or v:IsA("ShirtGraphic") or v:IsA("Accessory") or v:IsA("Hat") or v.Name == "BypassedAccessory" then
+                            v:Destroy()
+                        end
+                    end
+                    task.wait(0.3)
+                    
+                    local appearance = Players:GetCharacterAppearanceAsync(userId)
+                    if appearance then
+                        local hasClothes, hasAcc = false, false
+                        if logFunc then logFunc("Copying avatar data...", Color3.fromRGB(0, 255, 120)) end
+                        task.wait(0.3)
+
+                        for _, item in pairs(appearance:GetChildren()) do
+                            if item:IsA("Shirt") or item:IsA("Pants") or item:IsA("ShirtGraphic") or item:IsA("BodyColors") then
+                                item:Clone().Parent = char
+                                hasClothes = true
+                            elseif item:IsA("Accessory") or item:IsA("Hat") then
+                                local cloneAcc = item:Clone()
+                                local handle = cloneAcc:FindFirstChild("Handle")
+                                if handle then
+                                    local accAttachment = handle:FindFirstChildOfClass("Attachment")
+                                    local attachmentName = accAttachment and accAttachment.Name or "HatAttachment"
+                                    local targetPart, charAttachment
+                                    for _, part in pairs(char:GetChildren()) do
+                                        if part:IsA("BasePart") then
+                                            local att = part:FindFirstChild(attachmentName)
+                                            if att then targetPart = part; charAttachment = att; break end
+                                        end
+                                    end
+                                    targetPart = targetPart or char:FindFirstChild("Head")
+                                    if targetPart then
+                                        handle.CanCollide, handle.Massless = false, true
+                                        local weld = Instance.new("Weld")
+                                        weld.Name = "AccessoryWeld"
+                                        weld.Part0, weld.Part1 = targetPart, handle
+                                        if charAttachment and accAttachment then
+                                            weld.C0, weld.C1 = charAttachment.CFrame, accAttachment.CFrame
+                                        elseif attachmentName == "HatAttachment" then
+                                            weld.C0 = CFrame.new(0, 0.5, 0)
+                                        end
+                                        weld.Parent = handle
+                                        handle.Name, handle.Parent = "BypassedAccessory", char
+                                        cloneAcc:Destroy()
+                                    end
+                                else
+                                    hum:AddAccessory(cloneAcc)
+                                end
+                                hasAcc = true
+                            end
+                        end
+                        if logFunc then 
+                            if hasClothes then logFunc("Applying clothes...", Color3.fromRGB(0, 255, 120)); task.wait(0.3) end
+                            if hasAcc then logFunc("Forcing accessories bypass...", Color3.fromRGB(0, 255, 120)); task.wait(0.3) end
+                            logFunc("Operation completed successfully!", Color3.fromRGB(0, 200, 255)) 
+                        end
+                    else
+                        if logFunc then logFunc("Error: Failed to load data.", Color3.fromRGB(255, 50, 50)) end
+                    end
+                end)
+            else
+                if logFunc then logFunc("Error: Character not found.", Color3.fromRGB(255, 50, 50)) end
+            end
+        else
+            if logFunc then logFunc("Error: Invalid username.", Color3.fromRGB(255, 50, 50)) end
+        end
+    end)
+end
+
+if GlobalData.AutoSteal and GlobalData.SavedAvatarUser ~= "" then
+    task.spawn(function()
+        task.wait(2)
+        ApplyAvatarLogic(GlobalData.SavedAvatarUser, nil)
     end)
 end
 
@@ -295,8 +429,8 @@ local function CreatePage(name, index)
 
     if name == "Main" then
         local WelcomeLabel = Instance.new("TextLabel", Page)
-        WelcomeLabel.Size = UDim2.new(1, 0, 1, -40)
-        WelcomeLabel.Position = UDim2.new(0, 0, 0, 30)
+        WelcomeLabel.Size = UDim2.new(1, 0, 0, 60)
+        WelcomeLabel.Position = UDim2.new(0, 0, 0, 40)
         WelcomeLabel.BackgroundTransparency = 1
         WelcomeLabel.Font = Enum.Font.GothamBold
         WelcomeLabel.TextSize = 22
@@ -304,23 +438,41 @@ local function CreatePage(name, index)
         WelcomeLabel.TextXAlignment = Enum.TextXAlignment.Center
         WelcomeLabel.TextYAlignment = Enum.TextYAlignment.Center
         WelcomeLabel.Text = "Welcome to Tolhub"
+        
+        -- إضافة زر إظهار الهيت بوكس في صفحة Main
+        local HitboxToggleBtn = Instance.new("TextButton", Page)
+        HitboxToggleBtn.Size = UDim2.new(0.8, 0, 0, 40)
+        HitboxToggleBtn.Position = UDim2.new(0.1, 0, 0, 110)
+        HitboxToggleBtn.Text = "Show Visual Hitboxes: OFF"
+        HitboxToggleBtn.Font = Enum.Font.GothamBold
+        HitboxToggleBtn.TextSize = 14
+        HitboxToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        HitboxToggleBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+        Instance.new("UICorner", HitboxToggleBtn).CornerRadius = UDim.new(0, 8)
+        
+        HitboxToggleBtn.MouseButton1Click:Connect(function()
+            ShowHitboxes = not ShowHitboxes
+            HitboxToggleBtn.Text = "Show Visual Hitboxes: " .. (ShowHitboxes and "ON" or "OFF")
+            HitboxToggleBtn.BackgroundColor3 = ShowHitboxes and Color3.fromRGB(0, 170, 255) or Color3.fromRGB(40, 40, 45)
+            UpdateHitboxVisuals()
+        end)
 
     elseif name == "Avatar Stealer" then
         local TitleDesc = Instance.new("TextLabel", Page)
-        TitleDesc.Size = UDim2.new(1, 0, 0, 40)
+        TitleDesc.Size = UDim2.new(1, 0, 0, 30)
         TitleDesc.Position = UDim2.new(0, 0, 0, 20)
         TitleDesc.BackgroundTransparency = 1
         TitleDesc.Font = Enum.Font.Gotham
         TitleDesc.TextSize = 13
         TitleDesc.TextColor3 = Color3.fromRGB(200, 200, 200)
         TitleDesc.TextXAlignment = Enum.TextXAlignment.Left
-        TitleDesc.Text = "Enter Username to Steal Avatar:"
+        TitleDesc.Text = "Target Username:"
 
         local UserBox = Instance.new("TextBox", Page)
-        UserBox.Size = UDim2.new(0.65, 0, 0, 40) 
-        UserBox.Position = UDim2.new(0, 0, 0, 65)
+        UserBox.Size = UDim2.new(0.65, 0, 0, 35) 
+        UserBox.Position = UDim2.new(0, 0, 0, 50)
         UserBox.PlaceholderText = "Username here..."
-        UserBox.Text = ""
+        UserBox.Text = GlobalData.SavedAvatarUser
         UserBox.Font = Enum.Font.Gotham
         UserBox.TextSize = 13
         UserBox.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -329,8 +481,8 @@ local function CreatePage(name, index)
         Instance.new("UICorner", UserBox).CornerRadius = UDim.new(0, 8)
 
         local StealBtn = Instance.new("TextButton", Page)
-        StealBtn.Size = UDim2.new(0.28, 0, 0, 40)
-        StealBtn.Position = UDim2.new(0.67, 0, 0, 65)
+        StealBtn.Size = UDim2.new(0.28, 0, 0, 35)
+        StealBtn.Position = UDim2.new(0.67, 0, 0, 50)
         StealBtn.Text = "Steal"
         StealBtn.Font = Enum.Font.GothamBold
         StealBtn.TextSize = 13
@@ -338,9 +490,29 @@ local function CreatePage(name, index)
         StealBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
         Instance.new("UICorner", StealBtn).CornerRadius = UDim.new(0, 8)
 
+        local ResetBtn = Instance.new("TextButton", Page)
+        ResetBtn.Size = UDim2.new(0.46, 0, 0, 35)
+        ResetBtn.Position = UDim2.new(0, 0, 0, 90)
+        ResetBtn.Text = "Reset Avatar"
+        ResetBtn.Font = Enum.Font.GothamBold
+        ResetBtn.TextSize = 12
+        ResetBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        ResetBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+        Instance.new("UICorner", ResetBtn).CornerRadius = UDim.new(0, 8)
+
+        local AutoBtn = Instance.new("TextButton", Page)
+        AutoBtn.Size = UDim2.new(0.46, 0, 0, 35)
+        AutoBtn.Position = UDim2.new(0.49, 0, 0, 90)
+        AutoBtn.Text = "Auto Steal: " .. (GlobalData.AutoSteal and "ON" or "OFF")
+        AutoBtn.Font = Enum.Font.GothamBold
+        AutoBtn.TextSize = 12
+        AutoBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        AutoBtn.BackgroundColor3 = GlobalData.AutoSteal and Color3.fromRGB(0, 200, 100) or Color3.fromRGB(60, 60, 65)
+        Instance.new("UICorner", AutoBtn).CornerRadius = UDim.new(0, 8)
+
         local LogFrame = Instance.new("ScrollingFrame", Page)
-        LogFrame.Size = UDim2.new(0.95, 0, 0, 100)
-        LogFrame.Position = UDim2.new(0, 0, 0, 115)
+        LogFrame.Size = UDim2.new(0.95, 0, 0, 95)
+        LogFrame.Position = UDim2.new(0, 0, 0, 135)
         LogFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 12)
         LogFrame.ScrollBarThickness = 2
         LogFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
@@ -348,7 +520,6 @@ local function CreatePage(name, index)
         
         local LogStroke = Instance.new("UIStroke", LogFrame)
         LogStroke.Color = Color3.fromRGB(0, 170, 255)
-        LogStroke.Thickness = 1
         LogStroke.Transparency = 0.5
 
         local LogList = Instance.new("UIListLayout", LogFrame)
@@ -356,9 +527,7 @@ local function CreatePage(name, index)
         LogList.SortOrder = Enum.SortOrder.LayoutOrder
 
         local UIPadding = Instance.new("UIPadding", LogFrame)
-        UIPadding.PaddingTop = UDim.new(0, 5)
-        UIPadding.PaddingLeft = UDim.new(0, 5)
-        UIPadding.PaddingBottom = UDim.new(0, 5)
+        UIPadding.PaddingTop, UIPadding.PaddingLeft, UIPadding.PaddingBottom = UDim.new(0, 5), UDim.new(0, 5), UDim.new(0, 5)
 
         local function writeLog(msg, color)
             local lbl = Instance.new("TextLabel", LogFrame)
@@ -369,134 +538,91 @@ local function CreatePage(name, index)
             lbl.TextColor3 = color or Color3.fromRGB(200, 200, 200)
             lbl.TextXAlignment = Enum.TextXAlignment.Left
             lbl.Text = "> " .. msg
-            
             LogFrame.CanvasSize = UDim2.new(0, 0, 0, LogList.AbsoluteContentSize.Y + 10)
             LogFrame.CanvasPosition = Vector2.new(0, LogFrame.CanvasSize.Y.Offset)
         end
 
-        writeLog("Waiting for command...", Color3.fromRGB(150, 150, 150))
+        writeLog("Ready.", Color3.fromRGB(150, 150, 150))
+
+        AutoBtn.MouseButton1Click:Connect(function()
+            GlobalData.AutoSteal = not GlobalData.AutoSteal
+            AutoBtn.Text = "Auto Steal: " .. (GlobalData.AutoSteal and "ON" or "OFF")
+            AutoBtn.BackgroundColor3 = GlobalData.AutoSteal and Color3.fromRGB(0, 200, 100) or Color3.fromRGB(60, 60, 65)
+            SaveConfig()
+            writeLog("Auto Steal " .. (GlobalData.AutoSteal and "Enabled" or "Disabled"), Color3.fromRGB(0, 170, 255))
+        end)
 
         StealBtn.MouseButton1Click:Connect(function()
             local targetName = string.match(UserBox.Text, "^%s*(.-)%s*$")
             if targetName and targetName ~= "" then
-                for _, child in pairs(LogFrame:GetChildren()) do
-                    if child:IsA("TextLabel") then child:Destroy() end
-                end
-                
+                for _, child in pairs(LogFrame:GetChildren()) do if child:IsA("TextLabel") then child:Destroy() end end
                 writeLog("Searching for [" .. targetName .. "]...", Color3.fromRGB(255, 170, 0))
                 
-                task.spawn(function()
-                    local success, userId = pcall(function()
-                        return Players:GetUserIdFromNameAsync(targetName)
-                    end)
-
-                    if success and userId then
-                        writeLog("Player found.", Color3.fromRGB(0, 255, 120))
-                        task.wait(0.3)
-                        
-                        local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-                        local hum = char:FindFirstChildOfClass("Humanoid")
-                        
-                        if hum then
-                            pcall(function()
-                                writeLog("Removing current avatar...", Color3.fromRGB(255, 170, 0))
-                                for _, v in pairs(char:GetChildren()) do
-                                    if v:IsA("Shirt") or v:IsA("Pants") or v:IsA("ShirtGraphic") or v:IsA("Accessory") or v:IsA("Hat") or v.Name == "BypassedAccessory" then
-                                        v:Destroy()
-                                    end
-                                end
-                                task.wait(0.3)
-                                
-                                local appearance = Players:GetCharacterAppearanceAsync(userId)
-                                if appearance then
-                                    local hasClothes = false
-                                    local hasAcc = false
-
-                                    writeLog("Copying avatar data...", Color3.fromRGB(0, 255, 120))
-                                    task.wait(0.3)
-
-                                    for _, item in pairs(appearance:GetChildren()) do
-                                        if item:IsA("Shirt") or item:IsA("Pants") or item:IsA("ShirtGraphic") or item:IsA("BodyColors") then
-                                            local clone = item:Clone()
-                                            clone.Parent = char
-                                            hasClothes = true
-                                        elseif item:IsA("Accessory") or item:IsA("Hat") then
-                                            -- Ultimate Accessories Bypass (Prevents Anti-Hat)
-                                            local cloneAcc = item:Clone()
-                                            local handle = cloneAcc:FindFirstChild("Handle")
-                                            
-                                            if handle then
-                                                local accAttachment = handle:FindFirstChildOfClass("Attachment")
-                                                local attachmentName = accAttachment and accAttachment.Name or "HatAttachment"
-                                                local targetPart, charAttachment
-                                                
-                                                for _, part in pairs(char:GetChildren()) do
-                                                    if part:IsA("BasePart") then
-                                                        local att = part:FindFirstChild(attachmentName)
-                                                        if att then
-                                                            targetPart = part
-                                                            charAttachment = att
-                                                            break
-                                                        end
-                                                    end
-                                                end
-
-                                                targetPart = targetPart or char:FindFirstChild("Head")
-                                                
-                                                if targetPart then
-                                                    handle.CanCollide = false
-                                                    handle.Massless = true
-                                                    
-                                                    local weld = Instance.new("Weld")
-                                                    weld.Name = "AccessoryWeld"
-                                                    weld.Part0 = targetPart
-                                                    weld.Part1 = handle
-                                                    
-                                                    if charAttachment and accAttachment then
-                                                        weld.C0 = charAttachment.CFrame
-                                                        weld.C1 = accAttachment.CFrame
-                                                    elseif attachmentName == "HatAttachment" then
-                                                        weld.C0 = CFrame.new(0, 0.5, 0)
-                                                    end
-                                                    
-                                                    weld.Parent = handle
-                                                    handle.Name = "BypassedAccessory"
-                                                    handle.Parent = char
-                                                    
-                                                    cloneAcc:Destroy() -- Destroy wrapper to avoid detection
-                                                end
-                                            else
-                                                hum:AddAccessory(cloneAcc)
-                                            end
-                                            hasAcc = true
-                                        end
-                                    end
-                                    
-                                    if hasClothes then
-                                        writeLog("Applying clothes...", Color3.fromRGB(0, 255, 120))
-                                        task.wait(0.3)
-                                    end
-                                    
-                                    if hasAcc then
-                                        writeLog("Forcing accessories bypass...", Color3.fromRGB(0, 255, 120))
-                                        task.wait(0.3)
-                                    end
-
-                                    writeLog("Operation completed!", Color3.fromRGB(0, 200, 255))
-                                else
-                                    writeLog("Error: Failed to load data.", Color3.fromRGB(255, 50, 50))
-                                end
-                            end)
-                        else
-                            writeLog("Error: Character not found.", Color3.fromRGB(255, 50, 50))
-                        end
-                    else
-                        writeLog("Error: Invalid username.", Color3.fromRGB(255, 50, 50))
-                    end
-                end)
+                GlobalData.SavedAvatarUser = targetName
+                SaveConfig()
+                
+                ApplyAvatarLogic(targetName, writeLog)
             else
                 writeLog("Warning: Please enter a username!", Color3.fromRGB(255, 50, 50))
             end
+        end)
+
+        ResetBtn.MouseButton1Click:Connect(function()
+            for _, child in pairs(LogFrame:GetChildren()) do if child:IsA("TextLabel") then child:Destroy() end end
+            writeLog("Resetting avatar to original...", Color3.fromRGB(255, 170, 0))
+            task.spawn(function()
+                local char = LocalPlayer.Character
+                if char then
+                    for _, v in pairs(char:GetChildren()) do
+                        if v:IsA("Shirt") or v:IsA("Pants") or v:IsA("ShirtGraphic") or v:IsA("Accessory") or v:IsA("Hat") or v.Name == "BypassedAccessory" then
+                            v:Destroy()
+                        end
+                    end
+                    local appearance = Players:GetCharacterAppearanceAsync(LocalPlayer.UserId)
+                    if appearance then
+                        for _, item in pairs(appearance:GetChildren()) do
+                            if item:IsA("Shirt") or item:IsA("Pants") or item:IsA("ShirtGraphic") or item:IsA("BodyColors") then
+                                item:Clone().Parent = char
+                            elseif item:IsA("Accessory") or item:IsA("Hat") then
+                                local cloneAcc = item:Clone()
+                                local handle = cloneAcc:FindFirstChild("Handle")
+                                if handle then
+                                    local accAttachment = handle:FindFirstChildOfClass("Attachment")
+                                    local attachmentName = accAttachment and accAttachment.Name or "HatAttachment"
+                                    local targetPart, charAttachment
+                                    for _, part in pairs(char:GetChildren()) do
+                                        if part:IsA("BasePart") then
+                                            local att = part:FindFirstChild(attachmentName)
+                                            if att then targetPart = part; charAttachment = att; break end
+                                        end
+                                    end
+                                    targetPart = targetPart or char:FindFirstChild("Head")
+                                    if targetPart then
+                                        handle.CanCollide, handle.Massless = false, true
+                                        local weld = Instance.new("Weld")
+                                        weld.Name = "AccessoryWeld"
+                                        weld.Part0, weld.Part1 = targetPart, handle
+                                        if charAttachment and accAttachment then
+                                            weld.C0, weld.C1 = charAttachment.CFrame, accAttachment.CFrame
+                                        elseif attachmentName == "HatAttachment" then
+                                            weld.C0 = CFrame.new(0, 0.5, 0)
+                                        end
+                                        weld.Parent = handle
+                                        handle.Name, handle.Parent = "BypassedAccessory", char
+                                        cloneAcc:Destroy()
+                                    end
+                                else
+                                    local hum = char:FindFirstChildOfClass("Humanoid")
+                                    if hum then hum:AddAccessory(cloneAcc) end
+                                end
+                            end
+                        end
+                        writeLog("Avatar reset successfully!", Color3.fromRGB(0, 255, 120))
+                    else
+                        writeLog("Failed to load original avatar.", Color3.fromRGB(255, 50, 50))
+                    end
+                end
+            end)
         end)
 
     elseif name == "Info" then
@@ -606,18 +732,12 @@ local function CreatePage(name, index)
         end
 
         ToggleBtn.MouseButton1Click:Connect(function()
-            if name == "Air Dribble" then
-                ShowNotification("Coming soon next update!")
-                return
-            end
-            
+            if name == "Air Dribble" then return end
             Configs[name].Enabled = not Configs[name].Enabled
             ToggleBtn.Text = name .. ": " .. (Configs[name].Enabled and "ENABLED" or "DISABLED")
             ToggleBtn.BackgroundColor3 = Configs[name].Enabled and Color3.fromRGB(0, 170, 255) or Color3.fromRGB(40, 40, 45)
             InfoLabel.TextColor3 = Configs[name].Enabled and Color3.fromRGB(0, 255, 120) or Color3.fromRGB(255, 100, 100)
-            
-            UpdateText()
-            SaveConfig()
+            UpdateText(); SaveConfig(); UpdateHitboxVisuals()
         end)
 
         local ControlFrame = Instance.new("Frame", Page)
@@ -646,42 +766,22 @@ local function CreatePage(name, index)
         Instance.new("UICorner", PlusBtn).CornerRadius = UDim.new(0, 10)
 
         MinusBtn.MouseButton1Click:Connect(function()
-            if name == "Air Dribble" then
-                ShowNotification("Coming soon next update!")
-                return
-            end
+            if name == "Air Dribble" then return end
             if Configs[name].Value > 0 then
                 Configs[name].Value = Configs[name].Value - 1
-                UpdateText()
-                SaveConfig()
+                UpdateText(); SaveConfig(); UpdateHitboxVisuals()
             end
         end)
 
         PlusBtn.MouseButton1Click:Connect(function()
-            if name == "Air Dribble" then
-                ShowNotification("Coming soon next update!")
-                return
-            end
+            if name == "Air Dribble" then return end
             if Configs[name].Value < GlobalData.MaxLimit then
                 Configs[name].Value = Configs[name].Value + 1
-                UpdateText()
-                SaveConfig()
+                UpdateText(); SaveConfig(); UpdateHitboxVisuals()
             elseif Configs[name].Value >= 15 and GlobalData.MaxLimit == 15 then
                 ShowNotification("Max limit is 15. Use code for 17!")
             end
         end)
-
-        if name == "Air Dribble" then
-            local ComingSoonLabel = Instance.new("TextLabel", Page)
-            ComingSoonLabel.Size = UDim2.new(0.95, 0, 0, 30)
-            ComingSoonLabel.Position = UDim2.new(0, 0, 0, 175)
-            ComingSoonLabel.BackgroundTransparency = 1
-            ComingSoonLabel.Font = Enum.Font.GothamBold
-            ComingSoonLabel.TextSize = 13
-            ComingSoonLabel.TextColor3 = Color3.fromRGB(255, 150, 0)
-            ComingSoonLabel.TextXAlignment = Enum.TextXAlignment.Center
-            ComingSoonLabel.Text = "⚠️ coming soon next update ⚠️"
-        end
     end
 
     Btn.MouseButton1Click:Connect(function()
@@ -701,9 +801,7 @@ local function CreatePage(name, index)
     end
 end
 
-for i, tabName in ipairs(Tabs) do
-    CreatePage(tabName, i)
-end
+for i, tabName in ipairs(Tabs) do CreatePage(tabName, i) end
 
 local function GetPlayerLeg(Char, Hum)
     local Folder = Lighting:FindFirstChild(LocalPlayer.Name)
@@ -719,7 +817,6 @@ end
 RunService.Heartbeat:Connect(function()
     local Character = LocalPlayer.Character
     if not Character then return end
-    
     local Humanoid = Character:FindFirstChildOfClass("Humanoid")
     local RootPart = Character:FindFirstChild("HumanoidRootPart")
     if not Humanoid or not RootPart then return end
@@ -734,6 +831,9 @@ RunService.Heartbeat:Connect(function()
     local Distance = (RootPart.Position - Ball.Position).Magnitude
     local ObjectSpace = RootPart.CFrame:PointToObjectSpace(Ball.Position)
     
+    local absX = math.abs(ObjectSpace.X)
+    local absZ = math.abs(ObjectSpace.Z)
+    
     local function FireTouch(direction)
         if (tick() - LastDirectionTicks[direction]) < Cooldowns[direction] then return end
         LastDirectionTicks[direction] = tick()
@@ -742,7 +842,6 @@ RunService.Heartbeat:Connect(function()
             local Camera = workspace.CurrentCamera
             if Camera then
                 local CamLookDir = Camera.CFrame.LookVector
-                
                 if direction == "Side" then
                     local SideDir = RootPart.CFrame.RightVector * (ObjectSpace.X > 0 and 1 or -1)
                     Ball.AssemblyLinearVelocity = (Ball.AssemblyLinearVelocity * 0.3) + (CamLookDir * 16) + (SideDir * 5)
@@ -751,7 +850,6 @@ RunService.Heartbeat:Connect(function()
                 end
             end
         end
-        
         if firetouchinterest then
             firetouchinterest(TargetLeg, Ball, 0)
             firetouchinterest(TargetLeg, Ball, 1)
@@ -759,23 +857,23 @@ RunService.Heartbeat:Connect(function()
     end
 
     if Configs.Front and Configs.Front.Enabled and Configs.Front.Value > 0 then
-        if Distance <= Configs.Front.Value and ObjectSpace.Z < 0 and math.abs(ObjectSpace.X) <= math.abs(ObjectSpace.Z) then 
+        if Distance <= Configs.Front.Value and ObjectSpace.Z < 0 and absX <= absZ then 
             FireTouch("Front") 
         end
     end
-
+    
     if Configs.Side and Configs.Side.Enabled and Configs.Side.Value > 0 then
-        if Distance <= Configs.Side.Value and math.abs(ObjectSpace.X) > math.abs(ObjectSpace.Z) then 
+        if Distance <= Configs.Side.Value and absX >= 1.2 and absZ >= 1.2 then 
             FireTouch("Side") 
         end
     end
-
+    
     if Configs.Back and Configs.Back.Enabled and Configs.Back.Value > 0 then
-        if Distance <= Configs.Back.Value and ObjectSpace.Z > 0 and math.abs(ObjectSpace.X) <= math.abs(ObjectSpace.Z) then 
+        if Distance <= Configs.Back.Value and ObjectSpace.Z > 0 and absX <= absZ then 
             FireTouch("Back") 
         end
     end
-
+    
     if Configs.Head and Configs.Head.Enabled and Configs.Head.Value > 0 then
         local HeightDiff = Ball.Position.Y - RootPart.Position.Y
         if Distance <= Configs.Head.Value and HeightDiff > 1 then 
