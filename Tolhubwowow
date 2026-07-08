@@ -173,60 +173,9 @@ local ToggleStroke = Instance.new("UIStroke", ToggleButton)
 ToggleStroke.Thickness = 1
 ToggleStroke.Color = Color3.fromRGB(0, 170, 255)
 
--- زر التعلق (Float)
-local FloatButton = Instance.new("TextButton", ScreenGui)
-FloatButton.Size = UDim2.new(0, 55, 0, 55)
-FloatButton.Position = UDim2.new(0.85, 0, 0.4, 0)
-FloatButton.Text = "Float\nOFF"
-FloatButton.Font = Enum.Font.GothamBold
-FloatButton.TextSize = 12
-FloatButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-FloatButton.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
-FloatButton.BackgroundTransparency = 0.2
-FloatButton.Visible = false 
-Instance.new("UICorner", FloatButton).CornerRadius = UDim.new(1, 0) 
-local FloatStroke = Instance.new("UIStroke", FloatButton)
-FloatStroke.Thickness = 2
-FloatStroke.Color = Color3.fromRGB(255, 255, 255)
-
-local IsFloating = false
-local FloatConnection = nil
-
-local function ToggleFloat(state)
-    IsFloating = state
-    if IsFloating then
-        FloatButton.Text = "Float\nON"
-        FloatButton.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
-        
-        FloatConnection = RunService.Heartbeat:Connect(function()
-            pcall(function()
-                local Char = LocalPlayer.Character
-                local Root = Char and Char:FindFirstChild("HumanoidRootPart")
-                local TPS = workspace:FindFirstChild("TPSSystem") and workspace.TPSSystem:FindFirstChild("TPS")
-                if Root and TPS then
-                    Root.CFrame = CFrame.new(TPS.Position + Vector3.new(0, 3.3, 0)) * (Root.CFrame.Rotation)
-                    Root.Velocity = Vector3.new(0,0,0)
-                end
-            end)
-        end)
-    else
-        FloatButton.Text = "Float\nOFF"
-        FloatButton.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
-        if FloatConnection then
-            FloatConnection:Disconnect()
-            FloatConnection = nil
-        end
-    end
-end
-
-SetupDraggableButton(FloatButton, function()
-    ToggleFloat(not IsFloating)
-end)
-
--- نظام Air Dribble المتوافق مع cloneref الخاص بالبيسي
+-- نظام Air Dribble المتوافق مع cloneref الخاص بالبيسي (بدون زر الفلوت)
 local function ToggleAirDribble(state, size)
     if state then
-        FloatButton.Visible = true 
         if getgenv().AirHelper then getgenv().AirHelper.destroy() end
         
         pcall(function()
@@ -269,8 +218,6 @@ local function ToggleAirDribble(state, size)
             }
         end)
     else
-        FloatButton.Visible = false 
-        if IsFloating then ToggleFloat(false) end 
         if getgenv().AirHelper then
             getgenv().AirHelper.destroy()
         end
@@ -471,7 +418,6 @@ local function CreatePage(name, index)
         Instance.new("UICorner", HitboxBtn).CornerRadius = UDim.new(0, 8)
 
         HitboxBtn.MouseButton1Click:Connect(function()
-            -- رسالة التنبيه بالصيانة
             ShowNotification("Hitboxes is currently under maintenance!")
         end)
 
