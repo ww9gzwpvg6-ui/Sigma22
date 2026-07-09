@@ -1,10 +1,10 @@
 -- Tolhub [Ultimate Quality - Camera Aim, Air Dribble & Realistic Float Edition]
--- PC & Xeno Fully Optimized Version
+-- PC & Xeno Fully Optimized Version (With Hidden Audio System)
 
 local TweenService = game:GetService("TweenService")
 local TargetGui = (gethui and gethui()) or game:GetService("CoreGui")
 
--- الحماية من التشغيل المتكرر مع إشعار بصري مرتب
+-- الحماية من التشغيل المتكرر
 if getgenv().TolhubLoaded then
     pcall(function()
         local AlertGui = TargetGui:FindFirstChild("Tolhub_Alerts") or Instance.new("ScreenGui", TargetGui)
@@ -17,7 +17,7 @@ if getgenv().TolhubLoaded then
         Instance.new("UICorner", NotifFrame).CornerRadius = UDim.new(0, 8)
         
         local NotifStroke = Instance.new("UIStroke", NotifFrame)
-        NotifStroke.Color = Color3.fromRGB(255, 80, 80) -- أحمر للتنبيه
+        NotifStroke.Color = Color3.fromRGB(255, 80, 80)
         NotifStroke.Thickness = 1
         
         local NotifText = Instance.new("TextLabel", NotifFrame)
@@ -51,7 +51,6 @@ local FixedCooldown = 0.04
 local LastTouchTick = 0
 local DiscordLink = "https://discord.gg/eEzWQJAyFA"
 
--- قيم وإعدادات
 local Configs = {
     Front = {Enabled = false, Value = 0},
     Side  = {Enabled = false, Value = 0},
@@ -66,7 +65,6 @@ local GlobalData = {
     CodeUsed = false
 }
 
--- نظام الحفظ الآمن (يتجاهل Air Dribble لكي لا يتم حفظه عند الخروج)
 local function SaveConfig()
     if writefile then
         pcall(function()
@@ -121,7 +119,6 @@ local ScreenGui = Instance.new("ScreenGui", TargetGui)
 ScreenGui.Name = "Tolhub"
 ScreenGui.ResetOnSpawn = false
 
--- دالة للسحب (Draggable) للأزرار
 local function SetupDraggableButton(btn, onClick)
     local Dragging = false
     local DragInput = nil
@@ -158,7 +155,6 @@ local function SetupDraggableButton(btn, onClick)
     end)
 end
 
--- زر فتح وإغلاق القائمة
 local ToggleButton = Instance.new("TextButton", ScreenGui)
 ToggleButton.Size = UDim2.new(0, 50, 0, 50)
 ToggleButton.Position = UDim2.new(0, 10, 0, 10)
@@ -173,7 +169,6 @@ local ToggleStroke = Instance.new("UIStroke", ToggleButton)
 ToggleStroke.Thickness = 1
 ToggleStroke.Color = Color3.fromRGB(0, 170, 255)
 
--- نظام Air Dribble المتوافق مع cloneref الخاص بالبيسي (بدون زر الفلوت)
 local function ToggleAirDribble(state, size)
     if state then
         if getgenv().AirHelper then getgenv().AirHelper.destroy() end
@@ -224,7 +219,6 @@ local function ToggleAirDribble(state, size)
     end
 end
 
--- واجهة المستخدم الرئيسية (MainFrame)
 local MainFrame = Instance.new("Frame", ScreenGui)
 MainFrame.Size = UDim2.new(0, 440, 0, 260)
 MainFrame.Position = UDim2.new(0.5, -220, 0.5, -130)
@@ -258,15 +252,20 @@ local Sidebar = Instance.new("ScrollingFrame", MainFrame)
 Sidebar.Size = UDim2.new(0, 110, 1, -20)
 Sidebar.Position = UDim2.new(0, 10, 0, 10)
 Sidebar.BackgroundTransparency = 1
-Sidebar.CanvasSize = UDim2.new(0, 0, 0, 300)
+Sidebar.CanvasSize = UDim2.new(0, 0, 0, 340)
 Sidebar.ScrollBarThickness = 0
+
+-- إضافة مرتب تلقائي للأزرار لكي لا يكون هناك مساحة فارغة للزر المخفي
+local SidebarLayout = Instance.new("UIListLayout", Sidebar)
+SidebarLayout.SortOrder = Enum.SortOrder.LayoutOrder
+SidebarLayout.Padding = UDim.new(0, 5)
 
 local PageContainer = Instance.new("Frame", MainFrame)
 PageContainer.Size = UDim2.new(1, -140, 1, -20)
 PageContainer.Position = UDim2.new(0, 130, 0, 10)
 PageContainer.BackgroundTransparency = 1
 
-local Tabs = {"Main", "Front", "Side", "Back", "Head", "Air Dribble", "Info"}
+local Tabs = {"Main", "Front", "Side", "Back", "Head", "Air Dribble", "Audio", "Info"}
 local Pages = {}
 local TabButtons = {}
 
@@ -294,14 +293,13 @@ local function ShowNotification(msg)
     end)
 end
 
--- نظام الهيت بوكس البصري (مُعطل مؤقتاً)
 local HitboxFolder = workspace:FindFirstChild("Tolhub_Hitboxes")
 if HitboxFolder then HitboxFolder:Destroy() end
 
 local function CreatePage(name, index)
     local Btn = Instance.new("TextButton", Sidebar)
     Btn.Size = UDim2.new(1, -5, 0, 35)
-    Btn.Position = UDim2.new(0, 0, 0, (index - 1) * 40)
+    Btn.LayoutOrder = index
     Btn.Text = name
     Btn.Font = Enum.Font.GothamBold
     Btn.TextSize = 12
@@ -310,6 +308,11 @@ local function CreatePage(name, index)
     Btn.BackgroundTransparency = 0.4
     Instance.new("UICorner", Btn).CornerRadius = UDim.new(0, 6)
     TabButtons[name] = Btn
+
+    -- إخفاء زر الـ Audio بشكل افتراضي
+    if name == "Audio" then
+        Btn.Visible = false
+    end
 
     local Page = Instance.new("Frame", PageContainer)
     Page.Size = UDim2.new(1, 0, 1, 0)
@@ -337,6 +340,135 @@ local function CreatePage(name, index)
         WelcomeLabel.TextXAlignment = Enum.TextXAlignment.Center
         WelcomeLabel.TextYAlignment = Enum.TextYAlignment.Center
         WelcomeLabel.Text = "Welcome to Tolhub"
+
+    elseif name == "Audio" then
+        local MyAudio = TargetGui:FindFirstChild("TolhubAudio") or Instance.new("Sound", TargetGui)
+        MyAudio.Name = "TolhubAudio"
+        MyAudio.Looped = true
+        local currentVol = 1.0
+        MyAudio.Volume = currentVol
+
+        local IdBox = Instance.new("TextBox", Page)
+        IdBox.Size = UDim2.new(0.95, 0, 0, 35)
+        IdBox.Position = UDim2.new(0, 0, 0, 25)
+        IdBox.PlaceholderText = "Enter Audio ID..."
+        IdBox.Text = ""
+        IdBox.Font = Enum.Font.Gotham
+        IdBox.TextSize = 13
+        IdBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+        IdBox.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+        Instance.new("UICorner", IdBox).CornerRadius = UDim.new(0, 8)
+
+        local PlayBtn = Instance.new("TextButton", Page)
+        PlayBtn.Size = UDim2.new(0.45, 0, 0, 35)
+        PlayBtn.Position = UDim2.new(0, 0, 0, 70)
+        PlayBtn.Text = "Play"
+        PlayBtn.Font = Enum.Font.GothamBold
+        PlayBtn.TextSize = 13
+        PlayBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        PlayBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+        Instance.new("UICorner", PlayBtn).CornerRadius = UDim.new(0, 8)
+
+        local StopBtn = Instance.new("TextButton", Page)
+        StopBtn.Size = UDim2.new(0.45, 0, 0, 35)
+        StopBtn.Position = UDim2.new(0.5, 0, 0, 70)
+        StopBtn.Text = "Stop"
+        StopBtn.Font = Enum.Font.GothamBold
+        StopBtn.TextSize = 13
+        StopBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        StopBtn.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
+        Instance.new("UICorner", StopBtn).CornerRadius = UDim.new(0, 8)
+
+        local VolLabel = Instance.new("TextLabel", Page)
+        VolLabel.Size = UDim2.new(0.95, 0, 0, 20)
+        VolLabel.Position = UDim2.new(0, 0, 0, 115)
+        VolLabel.BackgroundTransparency = 1
+        VolLabel.Font = Enum.Font.GothamBold
+        VolLabel.TextSize = 13
+        VolLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+        VolLabel.Text = "Volume: " .. currentVol
+
+        local ControlFrame = Instance.new("Frame", Page)
+        ControlFrame.Position = UDim2.new(0, 0, 0, 140)
+        ControlFrame.Size = UDim2.new(0.95, 0, 0, 35)
+        ControlFrame.BackgroundTransparency = 1
+
+        local MinusBtn = Instance.new("TextButton", ControlFrame)
+        MinusBtn.Size = UDim2.new(0, 45, 1, 0)
+        MinusBtn.Position = UDim2.new(0.5, -50, 0, 0)
+        MinusBtn.Text = "-"
+        MinusBtn.Font = Enum.Font.GothamBold
+        MinusBtn.TextSize = 22
+        MinusBtn.TextColor3 = Color3.fromRGB(20, 20, 20)
+        MinusBtn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        Instance.new("UICorner", MinusBtn).CornerRadius = UDim.new(0, 8)
+
+        local PlusBtn = Instance.new("TextButton", ControlFrame)
+        PlusBtn.Size = UDim2.new(0, 45, 1, 0)
+        PlusBtn.Position = UDim2.new(0.5, 5, 0, 0)
+        PlusBtn.Text = "+"
+        PlusBtn.Font = Enum.Font.GothamBold
+        PlusBtn.TextSize = 22
+        PlusBtn.TextColor3 = Color3.fromRGB(20, 20, 20)
+        PlusBtn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        Instance.new("UICorner", PlusBtn).CornerRadius = UDim.new(0, 8)
+
+        local LogLabel = Instance.new("TextLabel", Page)
+        LogLabel.Size = UDim2.new(0.95, 0, 0, 20)
+        LogLabel.Position = UDim2.new(0, 0, 0, 185)
+        LogLabel.BackgroundTransparency = 1
+        LogLabel.Font = Enum.Font.Gotham
+        LogLabel.TextSize = 12
+        LogLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
+        LogLabel.Text = "Status: Waiting for ID..."
+
+        MinusBtn.MouseButton1Click:Connect(function()
+            currentVol = math.max(0, currentVol - 0.5)
+            MyAudio.Volume = currentVol
+            VolLabel.Text = "Volume: " .. currentVol
+        end)
+
+        PlusBtn.MouseButton1Click:Connect(function()
+            currentVol = math.min(10, currentVol + 0.5)
+            MyAudio.Volume = currentVol
+            VolLabel.Text = "Volume: " .. currentVol
+        end)
+
+        StopBtn.MouseButton1Click:Connect(function()
+            MyAudio:Stop()
+            LogLabel.Text = "Status: Audio Stopped."
+            LogLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
+        end)
+
+        PlayBtn.MouseButton1Click:Connect(function()
+            local id = IdBox.Text:match("%d+")
+            if not id then
+                LogLabel.Text = "Status: Invalid ID format!"
+                LogLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+                return
+            end
+
+            LogLabel.Text = "Status: Loading audio..."
+            LogLabel.TextColor3 = Color3.fromRGB(255, 255, 100)
+
+            task.spawn(function()
+                MyAudio:Stop()
+                MyAudio.SoundId = "rbxassetid://" .. id
+                
+                local success = pcall(function()
+                    game:GetService("ContentProvider"):PreloadAsync({MyAudio})
+                end)
+
+                if success and MyAudio.TimeLength > 0 then
+                    LogLabel.Text = "Status: Audio loaded successfully!"
+                    LogLabel.TextColor3 = Color3.fromRGB(0, 255, 120)
+                    MyAudio:Play()
+                else
+                    LogLabel.Text = "Status: Audio banned or cannot be played!"
+                    LogLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+                end
+            end)
+        end)
 
     elseif name == "Info" then
         local InfoDesc = Instance.new("TextLabel", Page)
@@ -400,13 +532,29 @@ local function CreatePage(name, index)
                     SaveConfig()
                     ShowNotification("Success! Limit is 17 for 2 Days.")
                 end
+            elseif CodeBox.Text == "audio9" then
+                -- عند إدخال كود الصوت
+                if TabButtons["Audio"] then
+                    TabButtons["Audio"].Visible = true -- إظهار الزر الجانبي
+                    
+                    -- فتح صفحة الصوت تلقائياً للمستخدم
+                    for _, p in pairs(Pages) do p.Visible = false end
+                    for _, b in pairs(TabButtons) do 
+                        b.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+                        b.TextColor3 = Color3.fromRGB(180, 180, 180) 
+                    end
+                    Pages["Audio"].Visible = true
+                    TabButtons["Audio"].BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+                    TabButtons["Audio"].TextColor3 = Color3.fromRGB(255, 255, 255)
+
+                    ShowNotification("Audio Panel Unlocked!")
+                end
             else
                 ShowNotification("Wrong Code!")
             end
             CodeBox.Text = ""
         end)
         
-        -- زر عرض الهيت بوكس (في حالة صيانة)
         local HitboxBtn = Instance.new("TextButton", Page)
         HitboxBtn.Size = UDim2.new(0.95, 0, 0, 40)
         HitboxBtn.Position = UDim2.new(0, 0, 0, 180)
@@ -555,7 +703,6 @@ local function GetPlayerLeg(Char, Hum)
     end
 end
 
--- محرك الريتش والتوجيه المحمي المتوافق مع البيسي
 RunService.Heartbeat:Connect(function()
     local Character = LocalPlayer.Character
     if not Character then return end
