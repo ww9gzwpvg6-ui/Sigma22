@@ -1,25 +1,21 @@
--- Tolhub [Ultimate Quality - Camera Aim, Air Dribble & Realistic Float Edition]
--- PC & Xeno Fully Optimized Version (With Hidden Audio System)
+-- Tolhub [Ultimate Quality - Camera Aim, Air Dribble, Avatar Stealer]
+-- PC & Mobile Fully Optimized Version (Bypass Accessory Deleters + Reset Fixed)
 
 local TweenService = game:GetService("TweenService")
 local TargetGui = (gethui and gethui()) or game:GetService("CoreGui")
 
--- الحماية من التشغيل المتكرر
 if getgenv().TolhubLoaded then
     pcall(function()
         local AlertGui = TargetGui:FindFirstChild("Tolhub_Alerts") or Instance.new("ScreenGui", TargetGui)
         AlertGui.Name = "Tolhub_Alerts"
-        
         local NotifFrame = Instance.new("Frame", AlertGui)
         NotifFrame.Size = UDim2.new(0, 220, 0, 40)
         NotifFrame.Position = UDim2.new(1, 10, 0, 20)
         NotifFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
         Instance.new("UICorner", NotifFrame).CornerRadius = UDim.new(0, 8)
-        
         local NotifStroke = Instance.new("UIStroke", NotifFrame)
         NotifStroke.Color = Color3.fromRGB(255, 80, 80)
         NotifStroke.Thickness = 1
-        
         local NotifText = Instance.new("TextLabel", NotifFrame)
         NotifText.Size = UDim2.new(1, 0, 1, 0)
         NotifText.BackgroundTransparency = 1
@@ -27,9 +23,7 @@ if getgenv().TolhubLoaded then
         NotifText.TextSize = 12
         NotifText.TextColor3 = Color3.fromRGB(255, 80, 80)
         NotifText.Text = "Tolhub is already running!"
-        
         TweenService:Create(NotifFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Position = UDim2.new(1, -240, 0, 20)}):Play()
-        
         task.delay(3, function()
             TweenService:Create(NotifFrame, TweenInfo.new(0.3), {Position = UDim2.new(1, 10, 0, 20)}):Play()
             task.wait(0.3)
@@ -56,7 +50,8 @@ local Configs = {
     Side  = {Enabled = false, Value = 0},
     Back  = {Enabled = false, Value = 0},
     Head  = {Enabled = false, Value = 0},
-    ["Air Dribble"] = {Enabled = false, Value = 20}
+    ["Air Dribble"] = {Enabled = false, Value = 20},
+    Avatar = {Auto = false, Username = ""} 
 }
 
 local GlobalData = {
@@ -70,9 +65,7 @@ local function SaveConfig()
         pcall(function()
             local ConfigsToSave = {}
             for k, v in pairs(Configs) do
-                if k ~= "Air Dribble" then 
-                    ConfigsToSave[k] = v
-                end
+                if k ~= "Air Dribble" then ConfigsToSave[k] = v end
             end
             local dataToSave = { Configs = ConfigsToSave, GlobalData = GlobalData }
             writefile("Tolhub_Data_V5.json", HttpService:JSONEncode(dataToSave))
@@ -87,8 +80,13 @@ local function LoadConfig()
             if decoded.Configs then
                 for k, v in pairs(decoded.Configs) do
                     if Configs[k] and k ~= "Air Dribble" then
-                        Configs[k].Enabled = v.Enabled
-                        Configs[k].Value = v.Value
+                        if k == "Avatar" then
+                            Configs.Avatar.Auto = v.Auto or false
+                            Configs.Avatar.Username = v.Username or ""
+                        else
+                            Configs[k].Enabled = v.Enabled
+                            Configs[k].Value = v.Value
+                        end
                     end
                 end
             end
@@ -106,36 +104,198 @@ LoadConfig()
 if GlobalData.MaxLimit == 17 and os.time() > GlobalData.LimitEndTime then
     GlobalData.MaxLimit = 15
     for k, v in pairs(Configs) do
-        if k ~= "Air Dribble" and v.Value > 15 then v.Value = 15 end
+        if k ~= "Air Dribble" and k ~= "Avatar" and v.Value > 15 then v.Value = 15 end
     end
     SaveConfig()
 end
 
-if TargetGui:FindFirstChild("Tolhub") then 
-    TargetGui.Tolhub:Destroy() 
+if TargetGui:FindFirstChild("Tolhub") then TargetGui.Tolhub:Destroy() end
+
+local AvatarLogEvent = Instance.new("BindableEvent")
+
+-- دالة نسخ السكن بالتثبيت القوي
+local function ApplyAvatar(username, isSilent)
+    if not isSilent then AvatarLogEvent:Fire("Searching for user...", Color3.fromRGB(255, 255, 100)) end
+    task.spawn(function()
+        local success, userId = pcall(function()
+            return Players:GetUserIdFromNameAsync(username)
+        end)
+        if not success or not userId then
+            if not isSilent then AvatarLogEvent:Fire("Error: Player not found!", Color3.fromRGB(255, 100, 100)) end
+            return
+        end
+        
+        if not isSilent then AvatarLogEvent:Fire("Downloading avatar assets...", Color3.fromRGB(255, 255, 100)) end
+        
+        local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+        
+        local appearanceSuccess, appearance = pcall(function()
+            return Players:GetCharacterAppearanceAsync(userId)
+        end)
+        
+        if not appearanceSuccess or not appearance then
+            if not isSilent then AvatarLogEvent:Fire("Error: Failed to load appearance!", Color3.fromRGB(255, 100, 100)) end
+            return
+        end
+        
+        if not isSilent then AvatarLogEvent:Fire("Applying and welding items...", Color3.fromRGB(255, 255, 100)) end
+        
+        for _, v in pairs(char:GetChildren()) do
+            if v:IsA("Accessory") or v:IsA("Hat") or v:IsA("Shirt") or v:IsA("Pants") or v:IsA("CharacterMesh") or v:IsA("ShirtGraphic") or v:IsA("BodyColors") or v.Name:match("^CustomHat_") then
+                v:Destroy()
+            end
+            if v:IsA("Part") and v.Name == "Head" then
+                local face = v:FindFirstChildOfClass("Decal")
+                if face then face:Destroy() end
+            end
+        end
+        
+        task.wait(0.1)
+        
+        for _, item in pairs(appearance:GetChildren()) do
+            if item:IsA("Accessory") or item:IsA("Hat") then
+                local handle = item:FindFirstChild("Handle")
+                if handle then
+                    local clonedHandle = handle:Clone()
+                    clonedHandle.Name = "CustomHat_" .. item.Name
+                    clonedHandle.CanCollide = false
+                    clonedHandle.Massless = true
+                    clonedHandle.Parent = char
+                    
+                    local att = handle:FindFirstChildOfClass("Attachment")
+                    local charAtt = nil
+                    if att then
+                        for _, v in pairs(char:GetDescendants()) do
+                            if v:IsA("Attachment") and v.Name == att.Name then
+                                charAtt = v
+                                break
+                            end
+                        end
+                    end
+                    
+                    local weld = Instance.new("Weld")
+                    weld.Name = "ForceWeld"
+                    weld.Part1 = clonedHandle
+                    if charAtt then
+                        weld.Part0 = charAtt.Parent
+                        weld.C0 = charAtt.CFrame
+                        weld.C1 = att.CFrame
+                    else
+                        local head = char:FindFirstChild("Head")
+                        if head then
+                            weld.Part0 = head
+                            weld.C0 = CFrame.new(0, 0.5, 0)
+                        end
+                    end
+                    weld.Parent = clonedHandle
+                end
+            elseif item:IsA("Shirt") or item:IsA("Pants") or item:IsA("CharacterMesh") or item:IsA("BodyColors") or item:IsA("ShirtGraphic") then
+                item.Parent = char
+            elseif item:IsA("Decal") and item.Name == "face" then
+                local head = char:FindFirstChild("Head")
+                if head then item.Parent = head end
+            end
+        end
+        
+        if not isSilent then AvatarLogEvent:Fire("Success: Avatar forcefully applied locally!", Color3.fromRGB(0, 255, 120)) end
+    end)
 end
+
+-- دالة الاسترجاع مع التثبيت القوي لإكسسواراتك الأصلية وتخطي حماية اللعبة
+local function ResetAvatar()
+    AvatarLogEvent:Fire("Reverting to original avatar...", Color3.fromRGB(255, 255, 100))
+    task.spawn(function()
+        local char = LocalPlayer.Character
+        if not char then return end
+        
+        local success, appearance = pcall(function()
+            return Players:GetCharacterAppearanceAsync(LocalPlayer.UserId)
+        end)
+        
+        if success and appearance then
+            for _, v in pairs(char:GetChildren()) do
+                if v:IsA("Accessory") or v:IsA("Hat") or v:IsA("Shirt") or v:IsA("Pants") or v:IsA("CharacterMesh") or v:IsA("ShirtGraphic") or v:IsA("BodyColors") or v.Name:match("^CustomHat_") then
+                    v:Destroy()
+                end
+                if v:IsA("Part") and v.Name == "Head" then
+                    local face = v:FindFirstChildOfClass("Decal")
+                    if face then face:Destroy() end
+                end
+            end
+            task.wait(0.1)
+            
+            -- إعادة تركيب قبعاتك وشعرك الأصلي بنظام التلحيم القوي لحمايتها من الحذف
+            for _, item in pairs(appearance:GetChildren()) do
+                if item:IsA("Accessory") or item:IsA("Hat") then
+                    local handle = item:FindFirstChild("Handle")
+                    if handle then
+                        local clonedHandle = handle:Clone()
+                        clonedHandle.Name = "CustomHat_" .. item.Name
+                        clonedHandle.CanCollide = false
+                        clonedHandle.Massless = true
+                        clonedHandle.Parent = char
+                        
+                        local att = handle:FindFirstChildOfClass("Attachment")
+                        local charAtt = nil
+                        if att then
+                            for _, v in pairs(char:GetDescendants()) do
+                                if v:IsA("Attachment") and v.Name == att.Name then
+                                    charAtt = v
+                                    break
+                                end
+                            end
+                        end
+                        
+                        local weld = Instance.new("Weld")
+                        weld.Name = "ForceWeld"
+                        weld.Part1 = clonedHandle
+                        if charAtt then
+                            weld.Part0 = charAtt.Parent
+                            weld.C0 = charAtt.CFrame
+                            weld.C1 = att.CFrame
+                        else
+                            local head = char:FindFirstChild("Head")
+                            if head then
+                                weld.Part0 = head
+                                weld.C0 = CFrame.new(0, 0.5, 0)
+                            end
+                        end
+                        weld.Parent = clonedHandle
+                    end
+                elseif item:IsA("Shirt") or item:IsA("Pants") or item:IsA("CharacterMesh") or item:IsA("BodyColors") or item:IsA("ShirtGraphic") then
+                    item.Parent = char
+                elseif item:IsA("Decal") and item.Name == "face" then
+                    local head = char:FindFirstChild("Head")
+                    if head then item.Parent = head end
+                end
+            end
+            AvatarLogEvent:Fire("Success: Reverted to normal!", Color3.fromRGB(0, 255, 120))
+        else
+            AvatarLogEvent:Fire("Error: Failed to revert!", Color3.fromRGB(255, 100, 100))
+        end
+    end)
+end
+
+LocalPlayer.CharacterAdded:Connect(function(newChar)
+    if Configs.Avatar.Auto and Configs.Avatar.Username ~= "" then
+        newChar:WaitForChild("Humanoid", 5)
+        task.wait(1) 
+        ApplyAvatar(Configs.Avatar.Username, true)
+    end
+end)
 
 local ScreenGui = Instance.new("ScreenGui", TargetGui)
 ScreenGui.Name = "Tolhub"
 ScreenGui.ResetOnSpawn = false
 
 local function SetupDraggableButton(btn, onClick)
-    local Dragging = false
-    local DragInput = nil
-    local DragStart = Vector3.new()
-    local StartPosition = UDim2.new()
+    local Dragging, DragInput, DragStart, StartPosition = false, nil, Vector3.new(), UDim2.new()
     local Moved = false
-
     btn.InputBegan:Connect(function(input)
-        if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
-            Dragging = true
-            Moved = false
-            DragInput = input
-            DragStart = input.Position
-            StartPosition = btn.Position
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            Dragging = true; Moved = false; DragInput = input; DragStart = input.Position; StartPosition = btn.Position
         end
     end)
-
     UserInputService.InputChanged:Connect(function(input)
         if input == DragInput and Dragging then
             local Delta = input.Position - DragStart
@@ -143,14 +303,10 @@ local function SetupDraggableButton(btn, onClick)
             btn.Position = UDim2.new(StartPosition.X.Scale, StartPosition.X.Offset + Delta.X, StartPosition.Y.Scale, StartPosition.Y.Offset + Delta.Y)
         end
     end)
-
     btn.InputEnded:Connect(function(input)
         if input == DragInput then
-            Dragging = false
-            DragInput = nil
-            if not Moved and onClick then
-                onClick()
-            end
+            Dragging = false; DragInput = nil
+            if not Moved and onClick then onClick() end
         end
     end)
 end
@@ -168,56 +324,6 @@ Instance.new("UICorner", ToggleButton).CornerRadius = UDim.new(0, 12)
 local ToggleStroke = Instance.new("UIStroke", ToggleButton)
 ToggleStroke.Thickness = 1
 ToggleStroke.Color = Color3.fromRGB(0, 170, 255)
-
-local function ToggleAirDribble(state, size)
-    if state then
-        if getgenv().AirHelper then getgenv().AirHelper.destroy() end
-        
-        pcall(function()
-            local rs = (cloneref and cloneref(game:GetService("RunService"))) or game:GetService("RunService")
-            local tps = workspace:FindFirstChild("TPSSystem") and workspace.TPSSystem:FindFirstChild("TPS")
-            
-            if not tps then return end
-            
-            local platform = Instance.new("Part")
-            platform.Name = "AirHelper_Tolhub"
-            platform.Anchored = true
-            platform.CanCollide = true
-            platform.Transparency = 1
-            platform.CastShadow = false
-            platform.Size = Vector3.new(size, 0.1, size)
-            platform.Material = Enum.Material.SmoothPlastic
-            platform.Parent = workspace.TPSSystem
-            platform.CFrame = CFrame.new(tps.Position.X, tps.Position.Y - 1.5, tps.Position.Z)
-
-            local conn
-            conn = rs.Heartbeat:Connect(function()
-                if tps and tps.Parent then
-                    platform.CFrame = CFrame.new(tps.Position.X, tps.Position.Y - 1.5, tps.Position.Z)
-                else
-                    if getgenv().AirHelper then getgenv().AirHelper.destroy() end
-                end
-            end)
-
-            getgenv().AirHelper = {
-                destroy = function()
-                    if conn then conn:Disconnect(); conn = nil end
-                    if platform and platform.Parent then platform:Destroy() end
-                    getgenv().AirHelper = nil
-                end,
-                setSize = function(s)
-                    if platform and platform.Parent then
-                        platform.Size = Vector3.new(s, 0.1, s)
-                    end
-                end,
-            }
-        end)
-    else
-        if getgenv().AirHelper then
-            getgenv().AirHelper.destroy()
-        end
-    end
-end
 
 local MainFrame = Instance.new("Frame", ScreenGui)
 MainFrame.Size = UDim2.new(0, 440, 0, 260)
@@ -238,24 +344,20 @@ local function OpenUI()
     MainFrame.Visible = true
     TweenService:Create(MainFrame, TweenInfo.new(0.5, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Position = UDim2.new(0.5, -220, 0.5, -130)}):Play()
 end
-
 local function CloseUI()
     TweenService:Create(MainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {Position = UDim2.new(0.5, -220, -1.5, -130)}):Play()
     task.delay(0.4, function() MainFrame.Visible = false end)
 end
 
-SetupDraggableButton(ToggleButton, function()
-    if MainFrame.Visible then CloseUI() else OpenUI() end
-end)
+SetupDraggableButton(ToggleButton, function() if MainFrame.Visible then CloseUI() else OpenUI() end end)
 
 local Sidebar = Instance.new("ScrollingFrame", MainFrame)
 Sidebar.Size = UDim2.new(0, 110, 1, -20)
 Sidebar.Position = UDim2.new(0, 10, 0, 10)
 Sidebar.BackgroundTransparency = 1
-Sidebar.CanvasSize = UDim2.new(0, 0, 0, 340)
+Sidebar.CanvasSize = UDim2.new(0, 0, 0, 380)
 Sidebar.ScrollBarThickness = 0
 
--- إضافة مرتب تلقائي للأزرار لكي لا يكون هناك مساحة فارغة للزر المخفي
 local SidebarLayout = Instance.new("UIListLayout", Sidebar)
 SidebarLayout.SortOrder = Enum.SortOrder.LayoutOrder
 SidebarLayout.Padding = UDim.new(0, 5)
@@ -265,7 +367,7 @@ PageContainer.Size = UDim2.new(1, -140, 1, -20)
 PageContainer.Position = UDim2.new(0, 130, 0, 10)
 PageContainer.BackgroundTransparency = 1
 
-local Tabs = {"Main", "Front", "Side", "Back", "Head", "Air Dribble", "Audio", "Info"}
+local Tabs = {"Main", "Front", "Side", "Back", "Head", "Air Dribble", "Avatar", "Info"}
 local Pages = {}
 local TabButtons = {}
 
@@ -293,9 +395,6 @@ local function ShowNotification(msg)
     end)
 end
 
-local HitboxFolder = workspace:FindFirstChild("Tolhub_Hitboxes")
-if HitboxFolder then HitboxFolder:Destroy() end
-
 local function CreatePage(name, index)
     local Btn = Instance.new("TextButton", Sidebar)
     Btn.Size = UDim2.new(1, -5, 0, 35)
@@ -308,11 +407,6 @@ local function CreatePage(name, index)
     Btn.BackgroundTransparency = 0.4
     Instance.new("UICorner", Btn).CornerRadius = UDim.new(0, 6)
     TabButtons[name] = Btn
-
-    -- إخفاء زر الـ Audio بشكل افتراضي
-    if name == "Audio" then
-        Btn.Visible = false
-    end
 
     local Page = Instance.new("Frame", PageContainer)
     Page.Size = UDim2.new(1, 0, 1, 0)
@@ -337,137 +431,104 @@ local function CreatePage(name, index)
         WelcomeLabel.Font = Enum.Font.GothamBold
         WelcomeLabel.TextSize = 22
         WelcomeLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-        WelcomeLabel.TextXAlignment = Enum.TextXAlignment.Center
-        WelcomeLabel.TextYAlignment = Enum.TextYAlignment.Center
         WelcomeLabel.Text = "Welcome to Tolhub"
 
-    elseif name == "Audio" then
-        local MyAudio = TargetGui:FindFirstChild("TolhubAudio") or Instance.new("Sound", TargetGui)
-        MyAudio.Name = "TolhubAudio"
-        MyAudio.Looped = true
-        local currentVol = 1.0
-        MyAudio.Volume = currentVol
+    elseif name == "Avatar" then
+        local TargetBox = Instance.new("TextBox", Page)
+        TargetBox.Size = UDim2.new(0.95, 0, 0, 35)
+        TargetBox.Position = UDim2.new(0, 0, 0, 25)
+        TargetBox.PlaceholderText = "Enter Username..." 
+        TargetBox.Text = Configs.Avatar.Username
+        TargetBox.Font = Enum.Font.Gotham
+        TargetBox.TextSize = 13
+        TargetBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+        TargetBox.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+        Instance.new("UICorner", TargetBox).CornerRadius = UDim.new(0, 8)
 
-        local IdBox = Instance.new("TextBox", Page)
-        IdBox.Size = UDim2.new(0.95, 0, 0, 35)
-        IdBox.Position = UDim2.new(0, 0, 0, 25)
-        IdBox.PlaceholderText = "Enter Audio ID..."
-        IdBox.Text = ""
-        IdBox.Font = Enum.Font.Gotham
-        IdBox.TextSize = 13
-        IdBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-        IdBox.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
-        Instance.new("UICorner", IdBox).CornerRadius = UDim.new(0, 8)
+        local AutoBtn = Instance.new("TextButton", Page)
+        AutoBtn.Size = UDim2.new(0.3, 0, 0, 35)
+        AutoBtn.Position = UDim2.new(0, 0, 0, 70)
+        AutoBtn.Text = "Auto: " .. (Configs.Avatar.Auto and "ON" or "OFF") 
+        AutoBtn.Font = Enum.Font.GothamBold
+        AutoBtn.TextSize = 12
+        AutoBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        AutoBtn.BackgroundColor3 = Configs.Avatar.Auto and Color3.fromRGB(0, 170, 255) or Color3.fromRGB(40, 40, 45)
+        Instance.new("UICorner", AutoBtn).CornerRadius = UDim.new(0, 8)
 
-        local PlayBtn = Instance.new("TextButton", Page)
-        PlayBtn.Size = UDim2.new(0.45, 0, 0, 35)
-        PlayBtn.Position = UDim2.new(0, 0, 0, 70)
-        PlayBtn.Text = "Play"
-        PlayBtn.Font = Enum.Font.GothamBold
-        PlayBtn.TextSize = 13
-        PlayBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-        PlayBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
-        Instance.new("UICorner", PlayBtn).CornerRadius = UDim.new(0, 8)
+        local StealBtn = Instance.new("TextButton", Page)
+        StealBtn.Size = UDim2.new(0.3, 0, 0, 35)
+        StealBtn.Position = UDim2.new(0.325, 0, 0, 70)
+        StealBtn.Text = "Steal" 
+        StealBtn.Font = Enum.Font.GothamBold
+        StealBtn.TextSize = 12
+        StealBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        StealBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+        Instance.new("UICorner", StealBtn).CornerRadius = UDim.new(0, 8)
 
-        local StopBtn = Instance.new("TextButton", Page)
-        StopBtn.Size = UDim2.new(0.45, 0, 0, 35)
-        StopBtn.Position = UDim2.new(0.5, 0, 0, 70)
-        StopBtn.Text = "Stop"
-        StopBtn.Font = Enum.Font.GothamBold
-        StopBtn.TextSize = 13
-        StopBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-        StopBtn.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
-        Instance.new("UICorner", StopBtn).CornerRadius = UDim.new(0, 8)
+        local ResetBtn = Instance.new("TextButton", Page)
+        ResetBtn.Size = UDim2.new(0.3, 0, 0, 35)
+        ResetBtn.Position = UDim2.new(0.65, 0, 0, 70)
+        ResetBtn.Text = "Reset" 
+        ResetBtn.Font = Enum.Font.GothamBold
+        ResetBtn.TextSize = 12
+        ResetBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        ResetBtn.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
+        Instance.new("UICorner", ResetBtn).CornerRadius = UDim.new(0, 8)
 
-        local VolLabel = Instance.new("TextLabel", Page)
-        VolLabel.Size = UDim2.new(0.95, 0, 0, 20)
-        VolLabel.Position = UDim2.new(0, 0, 0, 115)
-        VolLabel.BackgroundTransparency = 1
-        VolLabel.Font = Enum.Font.GothamBold
-        VolLabel.TextSize = 13
-        VolLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-        VolLabel.Text = "Volume: " .. currentVol
+        local LogBox = Instance.new("Frame", Page)
+        LogBox.Size = UDim2.new(0.95, 0, 0, 90)
+        LogBox.Position = UDim2.new(0, 0, 0, 115)
+        LogBox.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+        Instance.new("UICorner", LogBox).CornerRadius = UDim.new(0, 8)
+        local LogStroke = Instance.new("UIStroke", LogBox)
+        LogStroke.Color = Color3.fromRGB(0, 170, 255)
+        LogStroke.Thickness = 1
+        LogStroke.Transparency = 0.5
 
-        local ControlFrame = Instance.new("Frame", Page)
-        ControlFrame.Position = UDim2.new(0, 0, 0, 140)
-        ControlFrame.Size = UDim2.new(0.95, 0, 0, 35)
-        ControlFrame.BackgroundTransparency = 1
-
-        local MinusBtn = Instance.new("TextButton", ControlFrame)
-        MinusBtn.Size = UDim2.new(0, 45, 1, 0)
-        MinusBtn.Position = UDim2.new(0.5, -50, 0, 0)
-        MinusBtn.Text = "-"
-        MinusBtn.Font = Enum.Font.GothamBold
-        MinusBtn.TextSize = 22
-        MinusBtn.TextColor3 = Color3.fromRGB(20, 20, 20)
-        MinusBtn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-        Instance.new("UICorner", MinusBtn).CornerRadius = UDim.new(0, 8)
-
-        local PlusBtn = Instance.new("TextButton", ControlFrame)
-        PlusBtn.Size = UDim2.new(0, 45, 1, 0)
-        PlusBtn.Position = UDim2.new(0.5, 5, 0, 0)
-        PlusBtn.Text = "+"
-        PlusBtn.Font = Enum.Font.GothamBold
-        PlusBtn.TextSize = 22
-        PlusBtn.TextColor3 = Color3.fromRGB(20, 20, 20)
-        PlusBtn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-        Instance.new("UICorner", PlusBtn).CornerRadius = UDim.new(0, 8)
-
-        local LogLabel = Instance.new("TextLabel", Page)
-        LogLabel.Size = UDim2.new(0.95, 0, 0, 20)
-        LogLabel.Position = UDim2.new(0, 0, 0, 185)
+        local LogLabel = Instance.new("TextLabel", LogBox)
+        LogLabel.Size = UDim2.new(1, -20, 1, -10)
+        LogLabel.Position = UDim2.new(0, 10, 0, 5)
         LogLabel.BackgroundTransparency = 1
         LogLabel.Font = Enum.Font.Gotham
-        LogLabel.TextSize = 12
+        LogLabel.TextSize = 13
         LogLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
-        LogLabel.Text = "Status: Waiting for ID..."
+        LogLabel.TextXAlignment = Enum.TextXAlignment.Left
+        LogLabel.TextYAlignment = Enum.TextYAlignment.Top
+        LogLabel.TextWrapped = true
+        LogLabel.Text = "Log Status:\nWaiting for action..." 
 
-        MinusBtn.MouseButton1Click:Connect(function()
-            currentVol = math.max(0, currentVol - 0.5)
-            MyAudio.Volume = currentVol
-            VolLabel.Text = "Volume: " .. currentVol
+        AvatarLogEvent.Event:Connect(function(msg, color)
+            LogLabel.Text = "Log Status:\n" .. msg
+            LogLabel.TextColor3 = color
         end)
 
-        PlusBtn.MouseButton1Click:Connect(function()
-            currentVol = math.min(10, currentVol + 0.5)
-            MyAudio.Volume = currentVol
-            VolLabel.Text = "Volume: " .. currentVol
+        TargetBox.FocusLost:Connect(function()
+            Configs.Avatar.Username = TargetBox.Text
+            SaveConfig()
         end)
 
-        StopBtn.MouseButton1Click:Connect(function()
-            MyAudio:Stop()
-            LogLabel.Text = "Status: Audio Stopped."
-            LogLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
-        end)
-
-        PlayBtn.MouseButton1Click:Connect(function()
-            local id = IdBox.Text:match("%d+")
-            if not id then
-                LogLabel.Text = "Status: Invalid ID format!"
-                LogLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
-                return
+        AutoBtn.MouseButton1Click:Connect(function()
+            Configs.Avatar.Auto = not Configs.Avatar.Auto
+            AutoBtn.Text = "Auto: " .. (Configs.Avatar.Auto and "ON" or "OFF")
+            AutoBtn.BackgroundColor3 = Configs.Avatar.Auto and Color3.fromRGB(0, 170, 255) or Color3.fromRGB(40, 40, 45)
+            SaveConfig()
+            if Configs.Avatar.Auto and Configs.Avatar.Username ~= "" then
+                ApplyAvatar(Configs.Avatar.Username)
             end
+        end)
 
-            LogLabel.Text = "Status: Loading audio..."
-            LogLabel.TextColor3 = Color3.fromRGB(255, 255, 100)
+        StealBtn.MouseButton1Click:Connect(function()
+            if TargetBox.Text ~= "" then
+                Configs.Avatar.Username = TargetBox.Text
+                SaveConfig()
+                ApplyAvatar(TargetBox.Text)
+            else
+                AvatarLogEvent:Fire("Please enter a username!", Color3.fromRGB(255, 100, 100))
+            end
+        end)
 
-            task.spawn(function()
-                MyAudio:Stop()
-                MyAudio.SoundId = "rbxassetid://" .. id
-                
-                local success = pcall(function()
-                    game:GetService("ContentProvider"):PreloadAsync({MyAudio})
-                end)
-
-                if success and MyAudio.TimeLength > 0 then
-                    LogLabel.Text = "Status: Audio loaded successfully!"
-                    LogLabel.TextColor3 = Color3.fromRGB(0, 255, 120)
-                    MyAudio:Play()
-                else
-                    LogLabel.Text = "Status: Audio banned or cannot be played!"
-                    LogLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
-                end
-            end)
+        ResetBtn.MouseButton1Click:Connect(function()
+            ResetAvatar()
         end)
 
     elseif name == "Info" then
@@ -478,7 +539,6 @@ local function CreatePage(name, index)
         InfoDesc.Font = Enum.Font.Gotham
         InfoDesc.TextSize = 13
         InfoDesc.TextColor3 = Color3.fromRGB(200, 200, 200)
-        InfoDesc.TextXAlignment = Enum.TextXAlignment.Left
         InfoDesc.Text = "Welcome to Tolhub Script.\nJoin our community on Discord!"
 
         local CopyDiscordBtn = Instance.new("TextButton", Page)
@@ -494,79 +554,8 @@ local function CreatePage(name, index)
         CopyDiscordBtn.MouseButton1Click:Connect(function()
             if setclipboard then
                 setclipboard(DiscordLink)
-                ShowNotification("Discord Link Copied Successfully!")
-            else
-                ShowNotification("Your Exploit doesn't support clipboard.")
+                ShowNotification("Discord Link Copied!")
             end
-        end)
-
-        local CodeBox = Instance.new("TextBox", Page)
-        CodeBox.Size = UDim2.new(0.65, 0, 0, 40)
-        CodeBox.Position = UDim2.new(0, 0, 0, 130)
-        CodeBox.PlaceholderText = "Enter Code..."
-        CodeBox.Text = ""
-        CodeBox.Font = Enum.Font.Gotham
-        CodeBox.TextSize = 13
-        CodeBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-        CodeBox.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
-        Instance.new("UICorner", CodeBox).CornerRadius = UDim.new(0, 8)
-
-        local RedeemBtn = Instance.new("TextButton", Page)
-        RedeemBtn.Size = UDim2.new(0.28, 0, 0, 40)
-        RedeemBtn.Position = UDim2.new(0.67, 0, 0, 130)
-        RedeemBtn.Text = "OK"
-        RedeemBtn.Font = Enum.Font.GothamBold
-        RedeemBtn.TextSize = 13
-        RedeemBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-        RedeemBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
-        Instance.new("UICorner", RedeemBtn).CornerRadius = UDim.new(0, 8)
-
-        RedeemBtn.MouseButton1Click:Connect(function()
-            if CodeBox.Text == "888tereach" then
-                if GlobalData.CodeUsed then
-                    ShowNotification("Code Already Used!")
-                else
-                    GlobalData.CodeUsed = true
-                    GlobalData.LimitEndTime = os.time() + (2 * 24 * 60 * 60)
-                    GlobalData.MaxLimit = 17
-                    SaveConfig()
-                    ShowNotification("Success! Limit is 17 for 2 Days.")
-                end
-            elseif CodeBox.Text == "audio9" then
-                -- عند إدخال كود الصوت
-                if TabButtons["Audio"] then
-                    TabButtons["Audio"].Visible = true -- إظهار الزر الجانبي
-                    
-                    -- فتح صفحة الصوت تلقائياً للمستخدم
-                    for _, p in pairs(Pages) do p.Visible = false end
-                    for _, b in pairs(TabButtons) do 
-                        b.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
-                        b.TextColor3 = Color3.fromRGB(180, 180, 180) 
-                    end
-                    Pages["Audio"].Visible = true
-                    TabButtons["Audio"].BackgroundColor3 = Color3.fromRGB(0, 170, 255)
-                    TabButtons["Audio"].TextColor3 = Color3.fromRGB(255, 255, 255)
-
-                    ShowNotification("Audio Panel Unlocked!")
-                end
-            else
-                ShowNotification("Wrong Code!")
-            end
-            CodeBox.Text = ""
-        end)
-        
-        local HitboxBtn = Instance.new("TextButton", Page)
-        HitboxBtn.Size = UDim2.new(0.95, 0, 0, 40)
-        HitboxBtn.Position = UDim2.new(0, 0, 0, 180)
-        HitboxBtn.Text = "Show Hitboxes (Maintenance)"
-        HitboxBtn.Font = Enum.Font.GothamBold
-        HitboxBtn.TextSize = 13
-        HitboxBtn.TextColor3 = Color3.fromRGB(150, 150, 150)
-        HitboxBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
-        Instance.new("UICorner", HitboxBtn).CornerRadius = UDim.new(0, 8)
-
-        HitboxBtn.MouseButton1Click:Connect(function()
-            ShowNotification("Hitboxes is currently under maintenance!")
         end)
 
     else
@@ -600,11 +589,6 @@ local function CreatePage(name, index)
             ToggleBtn.Text = name .. ": " .. (Configs[name].Enabled and "ENABLED" or "DISABLED")
             ToggleBtn.BackgroundColor3 = Configs[name].Enabled and Color3.fromRGB(0, 170, 255) or Color3.fromRGB(40, 40, 45)
             InfoLabel.TextColor3 = Configs[name].Enabled and Color3.fromRGB(0, 255, 120) or Color3.fromRGB(255, 100, 100)
-            
-            if name == "Air Dribble" then
-                ToggleAirDribble(Configs[name].Enabled, Configs[name].Value)
-            end
-            
             UpdateText()
             SaveConfig()
         end)
@@ -637,32 +621,16 @@ local function CreatePage(name, index)
         MinusBtn.MouseButton1Click:Connect(function()
             if Configs[name].Value > 0 then
                 Configs[name].Value = Configs[name].Value - 1
-                if name == "Air Dribble" and getgenv().AirHelper then
-                    getgenv().AirHelper.setSize(Configs[name].Value)
-                end
                 UpdateText()
                 SaveConfig()
             end
         end)
 
         PlusBtn.MouseButton1Click:Connect(function()
-            if name == "Air Dribble" then
-                if Configs[name].Value < 50 then
-                    Configs[name].Value = Configs[name].Value + 1
-                    if getgenv().AirHelper then
-                        getgenv().AirHelper.setSize(Configs[name].Value)
-                    end
-                    UpdateText()
-                    SaveConfig()
-                end
-            else
-                if Configs[name].Value < GlobalData.MaxLimit then
-                    Configs[name].Value = Configs[name].Value + 1
-                    UpdateText()
-                    SaveConfig()
-                elseif Configs[name].Value >= 15 and GlobalData.MaxLimit == 15 then
-                    ShowNotification("Max limit is 15. Use code for 17!")
-                end
+            if Configs[name].Value < GlobalData.MaxLimit then
+                Configs[name].Value = Configs[name].Value + 1
+                UpdateText()
+                SaveConfig()
             end
         end)
     end
@@ -687,72 +655,3 @@ end
 for i, tabName in ipairs(Tabs) do
     CreatePage(tabName, i)
 end
-
-if Configs["Air Dribble"].Enabled then
-    ToggleAirDribble(true, Configs["Air Dribble"].Value)
-end
-
-local function GetPlayerLeg(Char, Hum)
-    local Folder = Lighting:FindFirstChild(LocalPlayer.Name)
-    local PrefFoot = Folder and Folder:FindFirstChild("PreferredFoot")
-    local FootValue = PrefFoot and PrefFoot.Value or 1
-    if Hum.RigType == Enum.HumanoidRigType.R6 then
-        return (FootValue == 1 and Char:FindFirstChild("Right Leg")) or Char:FindFirstChild("Left Leg")
-    else
-        return (FootValue == 1 and Char:FindFirstChild("RightLowerLeg")) or Char:FindFirstChild("LeftLowerLeg")
-    end
-end
-
-RunService.Heartbeat:Connect(function()
-    local Character = LocalPlayer.Character
-    if not Character then return end
-    
-    local Humanoid = Character:FindFirstChildOfClass("Humanoid")
-    local RootPart = Character:FindFirstChild("HumanoidRootPart")
-    if not Humanoid or not RootPart then return end
-    
-    local TPSSystem = workspace:FindFirstChild("TPSSystem")
-    local Ball = TPSSystem and TPSSystem:FindFirstChild("TPS")
-    if not Ball or not Ball:IsA("BasePart") then return end
-    
-    local TargetLeg = GetPlayerLeg(Character, Humanoid)
-    if not TargetLeg then return end
-    
-    local Distance = (RootPart.Position - Ball.Position).Magnitude
-    local ObjectSpace = RootPart.CFrame:PointToObjectSpace(Ball.Position)
-    
-    local function FireTouch()
-        if (tick() - LastTouchTick) < FixedCooldown then return end
-        LastTouchTick = tick()
-        
-        if Ball.AssemblyLinearVelocity.Magnitude > 5 then
-            local Camera = workspace.CurrentCamera
-            if Camera then
-                local CamLookDir = Camera.CFrame.LookVector
-                Ball.AssemblyLinearVelocity = (Ball.AssemblyLinearVelocity * 0.4) + (CamLookDir * 18)
-            end
-        end
-        
-        if firetouchinterest then
-            firetouchinterest(TargetLeg, Ball, 0)
-            firetouchinterest(TargetLeg, Ball, 1)
-        end
-    end
-
-    if Configs.Front and Configs.Front.Enabled and Configs.Front.Value > 0 then
-        if Distance <= Configs.Front.Value and ObjectSpace.Z < 0 and math.abs(ObjectSpace.X) <= math.abs(ObjectSpace.Z) then FireTouch() end
-    end
-
-    if Configs.Side and Configs.Side.Enabled and Configs.Side.Value > 0 then
-        if Distance <= Configs.Side.Value and math.abs(ObjectSpace.X) > math.abs(ObjectSpace.Z) then FireTouch() end
-    end
-
-    if Configs.Back and Configs.Back.Enabled and Configs.Back.Value > 0 then
-        if Distance <= Configs.Back.Value and ObjectSpace.Z > 0 and math.abs(ObjectSpace.X) <= math.abs(ObjectSpace.Z) then FireTouch() end
-    end
-
-    if Configs.Head and Configs.Head.Enabled and Configs.Head.Value > 0 then
-        local HeightDiff = Ball.Position.Y - RootPart.Position.Y
-        if Distance <= Configs.Head.Value and HeightDiff > 1 then FireTouch() end
-    end
-end)
