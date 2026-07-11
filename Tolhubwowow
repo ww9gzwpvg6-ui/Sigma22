@@ -1,5 +1,4 @@
--- Tolhub [Ultimate Quality - Camera Aim, Air Dribble, Avatar Stealer]
--- PC & Mobile Fully Optimized Version (Bypass Accessory Deleters + Reset Fixed)
+    -- Tolhub tps script free
 
 local TweenService = game:GetService("TweenService")
 local TargetGui = (gethui and gethui()) or game:GetService("CoreGui")
@@ -654,7 +653,7 @@ for i, tabName in ipairs(Tabs) do
     CreatePage(tabName, i)
 end
 
--- [ نظام الريتش السريع للمراوغة (بدون كول داون + دبل تاتش) ] --
+-- [ نظام سحب الكرة المحسن والسريع (بدون تجميد للسماح بالشوت) ] --
 local function GetLeg(char, hum, pref)
     if hum.RigType == Enum.HumanoidRigType.R6 then
         return pref == 1 and char:FindFirstChild("Right Leg") or char:FindFirstChild("Left Leg")
@@ -698,13 +697,17 @@ RunService.RenderStepped:Connect(function()
         forceTake = true
     end
 
-    -- تنفيذ السحب الفوري المزدوج (بدون أي تأخير زمني) لضمان سرعة الاستجابة مع الشوت والمراوغة
+    -- نظام سحب محسّن ومطوّر (Fast Network Touch)
     if forceTake then
+        -- نستخدم firetouchinterest بشكل مزدوج وسريع جداً لضمان الاستحواذ الفوري
+        -- بدون التدخل في فيزياء الكرة (CFrame) لكي لا تلتصق وتتمكن من تسديدها (الشوت) بشكل طبيعي
         firetouchinterest(foot, tps, 0)
         firetouchinterest(foot, tps, 1)
         
-        -- إرسال لمسة ثانية فورية لضمان أخذ الكرة لاتجاه اللاعب الجديد دون تقطيع
-        firetouchinterest(foot, tps, 0)
-        firetouchinterest(foot, tps, 1)
+        -- إرسال لمسة إضافية وهمية لضمان عدم ضياع الاستجابة
+        task.spawn(function()
+            firetouchinterest(foot, tps, 0)
+            firetouchinterest(foot, tps, 1)
+        end)
     end
 end)
